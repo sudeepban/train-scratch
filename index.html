@@ -226,7 +226,6 @@
       scoreDisplay.textContent = score;
       comboDisplay.textContent = `x${combo}`;
 
-      // floating +pts label
       const rect = el.getBoundingClientRect();
       const label = document.createElement('div');
       label.className = 'pop-text';
@@ -255,11 +254,9 @@
     overlay.style.display = 'none';
     running = true;
 
-    // clear leftover bubbles
     arena.innerHTML = '';
     bubbles = [];
 
-    // spawn loop — speeds up as time passes
     let spawnDelay = 900;
     function scheduleSpawn() {
       if (!running) return;
@@ -290,7 +287,6 @@
     clearTimeout(spawnTimer);
     cancelAnimationFrame(rafId);
 
-    // pop all remaining bubbles
     [...arena.querySelectorAll('.bubble')].forEach(el => pop(el, false));
 
     finalScore.textContent = `Your score: ${score}`;
