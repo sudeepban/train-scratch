@@ -2,26 +2,305 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Hello World</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <title>Bubble Pop</title>
   <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
     body {
-      margin: 0;
-      min-height: 100vh;
+      background: #0f0c29;
+      font-family: system-ui, sans-serif;
+      color: #fff;
+      height: 100dvh;
+      overflow: hidden;
+      touch-action: none;
+    }
+
+    #hud {
+      position: fixed;
+      top: 0; left: 0; right: 0;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 12px 20px;
+      background: rgba(0,0,0,0.4);
+      z-index: 10;
+      font-size: 1.1rem;
+    }
+
+    #hud span { font-weight: 700; color: #a78bfa; }
+
+    #arena {
+      position: fixed;
+      inset: 0;
+      top: 48px;
+    }
+
+    .bubble {
+      position: absolute;
+      border-radius: 50%;
+      cursor: pointer;
       display: flex;
       align-items: center;
       justify-content: center;
-      font-family: system-ui, sans-serif;
-      background: #f0f4f8;
-      color: #1a202c;
+      font-size: 1.4rem;
+      user-select: none;
+      transition: transform 0.1s;
+      animation: swell 0.15s ease-out;
     }
-    h1 {
-      font-size: 3rem;
-      letter-spacing: -0.02em;
+
+    .bubble:active { transform: scale(0.85); }
+
+    @keyframes swell {
+      from { transform: scale(0); opacity: 0; }
+      to   { transform: scale(1); opacity: 1; }
+    }
+
+    @keyframes shrink {
+      to { transform: scale(0); opacity: 0; }
+    }
+
+    .bubble.dying {
+      animation: shrink 0.2s ease-in forwards;
+      pointer-events: none;
+    }
+
+    .pop-text {
+      position: absolute;
+      font-weight: 800;
+      font-size: 1.5rem;
+      pointer-events: none;
+      animation: float-up 0.6s ease-out forwards;
+      z-index: 20;
+    }
+
+    @keyframes float-up {
+      from { opacity: 1; transform: translateY(0) scale(1); }
+      to   { opacity: 0; transform: translateY(-60px) scale(1.4); }
+    }
+
+    #overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(15,12,41,0.92);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 16px;
+      z-index: 30;
+    }
+
+    #overlay h1 { font-size: 2.4rem; letter-spacing: -0.02em; }
+    #overlay p  { color: #a78bfa; font-size: 1rem; max-width: 280px; text-align: center; }
+
+    #overlay .score-line {
+      font-size: 1.2rem;
+      color: #fde68a;
+      display: none;
+    }
+
+    #btn {
+      margin-top: 8px;
+      padding: 14px 36px;
+      border: none;
+      border-radius: 999px;
+      background: linear-gradient(135deg, #7c3aed, #a78bfa);
+      color: #fff;
+      font-size: 1.1rem;
+      font-weight: 700;
+      cursor: pointer;
+      box-shadow: 0 4px 24px rgba(124,58,237,0.5);
+      transition: transform 0.1s;
+    }
+
+    #btn:active { transform: scale(0.95); }
+
+    #timer-bar-wrap {
+      position: fixed;
+      bottom: 0; left: 0; right: 0;
+      height: 6px;
+      background: rgba(255,255,255,0.1);
+      z-index: 10;
+    }
+
+    #timer-bar {
+      height: 100%;
+      background: linear-gradient(90deg, #7c3aed, #a78bfa);
+      transition: width 0.1s linear;
     }
   </style>
 </head>
 <body>
-  <h1>Hello, World!</h1>
+
+<div id="hud">
+  Score: <span id="score-display">0</span>
+  &nbsp;&nbsp;|&nbsp;&nbsp;
+  Combo: <span id="combo-display">x1</span>
+  &nbsp;&nbsp;|&nbsp;&nbsp;
+  Time: <span id="time-display">30</span>s
+</div>
+
+<div id="arena"></div>
+
+<div id="timer-bar-wrap"><div id="timer-bar" style="width:100%"></div></div>
+
+<div id="overlay">
+  <h1>Bubble Pop</h1>
+  <p>Tap bubbles before they vanish! Bigger combos = more points.</p>
+  <div class="score-line" id="final-score"></div>
+  <button id="btn">Play</button>
+</div>
+
+<script>
+  const arena        = document.getElementById('arena');
+  const overlay      = document.getElementById('overlay');
+  const btn          = document.getElementById('btn');
+  const scoreDisplay = document.getElementById('score-display');
+  const comboDisplay = document.getElementById('combo-display');
+  const timeDisplay  = document.getElementById('time-display');
+  const timerBar     = document.getElementById('timer-bar');
+  const finalScore   = document.getElementById('final-score');
+
+  const GAME_DURATION = 30;
+  const EMOJIS = ['🫧','💜','⭐','🔵','🟣','💫','🌀','✨'];
+  const COLORS = [
+    ['#7c3aed','#a78bfa'],
+    ['#0ea5e9','#38bdf8'],
+    ['#ec4899','#f9a8d4'],
+    ['#10b981','#6ee7b7'],
+    ['#f59e0b','#fde68a'],
+  ];
+
+  let score = 0, combo = 1, misses = 0;
+  let bubbles = [];
+  let spawnTimer, countdownTimer, rafId;
+  let timeLeft = GAME_DURATION;
+  let running = false;
+
+  function randBetween(a, b) { return a + Math.random() * (b - a); }
+
+  function spawnBubble() {
+    if (!running) return;
+
+    const size   = Math.round(randBetween(48, 96));
+    const aW     = arena.clientWidth  - size;
+    const aH     = arena.clientHeight - size;
+    const x      = randBetween(0, aW);
+    const y      = randBetween(0, aH);
+    const life   = randBetween(1800, 3400);
+    const [c1, c2] = COLORS[Math.floor(Math.random() * COLORS.length)];
+    const emoji  = EMOJIS[Math.floor(Math.random() * EMOJIS.length)];
+
+    const el = document.createElement('div');
+    el.className = 'bubble';
+    el.style.cssText = `
+      width:${size}px; height:${size}px;
+      left:${x}px; top:${y}px;
+      background: radial-gradient(circle at 35% 35%, ${c2}, ${c1});
+      box-shadow: 0 0 ${size/3}px ${c1}88;
+      font-size:${size * 0.42}px;
+    `;
+    el.textContent = emoji;
+
+    const expire = setTimeout(() => pop(el, false), life);
+
+    el.addEventListener('pointerdown', (e) => {
+      e.preventDefault();
+      clearTimeout(expire);
+      pop(el, true);
+    });
+
+    arena.appendChild(el);
+    bubbles.push({ el, expire });
+  }
+
+  function pop(el, hit) {
+    if (!el.parentNode || el.classList.contains('dying')) return;
+    el.classList.add('dying');
+
+    if (hit) {
+      combo = Math.min(combo + 1, 8);
+      const pts = 10 * combo;
+      score += pts;
+      scoreDisplay.textContent = score;
+      comboDisplay.textContent = `x${combo}`;
+
+      // floating +pts label
+      const rect = el.getBoundingClientRect();
+      const label = document.createElement('div');
+      label.className = 'pop-text';
+      label.textContent = `+${pts}`;
+      label.style.cssText = `
+        left:${rect.left + rect.width/2 - 20}px;
+        top:${rect.top - 10}px;
+        color:${combo >= 4 ? '#fde68a' : '#fff'};
+      `;
+      document.body.appendChild(label);
+      setTimeout(() => label.remove(), 620);
+    } else {
+      combo = 1;
+      comboDisplay.textContent = `x1`;
+    }
+
+    setTimeout(() => el.remove(), 220);
+  }
+
+  function startGame() {
+    score = 0; combo = 1; timeLeft = GAME_DURATION;
+    scoreDisplay.textContent = '0';
+    comboDisplay.textContent = 'x1';
+    timeDisplay.textContent = GAME_DURATION;
+    timerBar.style.width = '100%';
+    overlay.style.display = 'none';
+    running = true;
+
+    // clear leftover bubbles
+    arena.innerHTML = '';
+    bubbles = [];
+
+    // spawn loop — speeds up as time passes
+    let spawnDelay = 900;
+    function scheduleSpawn() {
+      if (!running) return;
+      spawnBubble();
+      spawnDelay = Math.max(300, spawnDelay - 8);
+      spawnTimer = setTimeout(scheduleSpawn, spawnDelay);
+    }
+    scheduleSpawn();
+
+    const startTime = performance.now();
+    function tick(now) {
+      const elapsed = (now - startTime) / 1000;
+      timeLeft = Math.max(0, GAME_DURATION - elapsed);
+      timeDisplay.textContent = Math.ceil(timeLeft);
+      timerBar.style.width = `${(timeLeft / GAME_DURATION) * 100}%`;
+
+      if (timeLeft <= 0) {
+        endGame();
+        return;
+      }
+      rafId = requestAnimationFrame(tick);
+    }
+    rafId = requestAnimationFrame(tick);
+  }
+
+  function endGame() {
+    running = false;
+    clearTimeout(spawnTimer);
+    cancelAnimationFrame(rafId);
+
+    // pop all remaining bubbles
+    [...arena.querySelectorAll('.bubble')].forEach(el => pop(el, false));
+
+    finalScore.textContent = `Your score: ${score}`;
+    finalScore.style.display = 'block';
+    btn.textContent = 'Play Again';
+    overlay.style.display = 'flex';
+  }
+
+  btn.addEventListener('click', startGame);
+  btn.addEventListener('touchstart', e => e.preventDefault(), { passive: false });
+</script>
 </body>
 </html>
