@@ -3,17 +3,17 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-  <title>Bubble Pop</title>
+  <title>Bubble Canvas</title>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
 
     body {
       background: #0f0c29;
-      font-family: system-ui, sans-serif;
-      color: #fff;
       height: 100dvh;
       overflow: hidden;
       touch-action: none;
+      font-family: system-ui, sans-serif;
+      color: #fff;
     }
 
     #hud {
@@ -22,524 +22,223 @@
       display: flex;
       justify-content: space-between;
       align-items: center;
-      padding: 12px 20px;
+      padding: 10px 16px;
       background: rgba(0,0,0,0.4);
       z-index: 10;
-      font-size: 1.1rem;
+      font-size: 0.85rem;
     }
 
-    #hud span { font-weight: 700; color: #a78bfa; }
-
-    #arena {
-      position: fixed;
-      inset: 0;
-      top: 48px;
-      bottom: 6px;
-    }
-
-    #game-canvas {
-      position: fixed;
-      left: 0; right: 0;
-      top: 48px;
-      width: 100%;
-      height: calc(100dvh - 54px);
-      display: none;
-    }
-
-    .bubble {
-      position: absolute;
+    #my-color {
+      width: 12px; height: 12px;
       border-radius: 50%;
-      cursor: pointer;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      user-select: none;
-      animation: swell 0.15s ease-out;
+      display: inline-block;
+      margin-right: 6px;
+      vertical-align: middle;
     }
 
-    .bubble:active { transform: scale(0.85); }
+    #status { color: rgba(255,255,255,0.4); font-size: 0.75rem; }
 
-    @keyframes swell {
-      from { transform: scale(0); opacity: 0; }
-      to   { transform: scale(1); opacity: 1; }
+    canvas {
+      position: fixed;
+      top: 40px; left: 0;
+      width: 100%;
+      height: calc(100dvh - 40px);
     }
 
-    @keyframes shrink {
-      to { transform: scale(0); opacity: 0; }
-    }
-
-    .bubble.dying {
-      animation: shrink 0.2s ease-in forwards;
+    #hint {
+      position: fixed;
+      bottom: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      font-size: 0.8rem;
+      color: rgba(255,255,255,0.3);
       pointer-events: none;
-    }
-
-    .pop-text {
-      position: fixed;
-      font-weight: 800;
-      font-size: 1.5rem;
-      pointer-events: none;
-      animation: float-up 0.6s ease-out forwards;
-      z-index: 20;
-    }
-
-    @keyframes float-up {
-      from { opacity: 1; transform: translateY(0) scale(1); }
-      to   { opacity: 0; transform: translateY(-60px) scale(1.4); }
-    }
-
-    #overlay {
-      position: fixed;
-      inset: 0;
-      background: rgba(15,12,41,0.92);
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      gap: 16px;
-      z-index: 30;
-    }
-
-    #overlay h1 { font-size: 2.4rem; letter-spacing: -0.02em; }
-    #overlay p  { color: #a78bfa; font-size: 1rem; max-width: 280px; text-align: center; }
-
-    .mode-btns { display: flex; gap: 8px; }
-
-    .mode-btn {
-      padding: 10px 28px;
-      border: 2px solid #7c3aed;
-      border-radius: 999px;
-      background: transparent;
-      color: #fff;
-      font-size: 1rem;
-      font-weight: 600;
-      cursor: pointer;
-      transition: background 0.15s;
-    }
-
-    .mode-btn.active { background: #7c3aed; }
-
-    .slider-row {
-      display: flex;
-      align-items: center;
-      gap: 12px;
-      font-size: 0.95rem;
-      color: #a78bfa;
-    }
-
-    #bubble-count-slider {
-      width: 140px;
-      accent-color: #7c3aed;
-    }
-
-    #bubble-count-label {
-      font-weight: 700;
-      color: #fff;
-      min-width: 32px;
-    }
-
-    .score-line {
-      font-size: 1.2rem;
-      color: #fde68a;
-      display: none;
-    }
-
-    #btn {
-      margin-top: 8px;
-      padding: 14px 36px;
-      border: none;
-      border-radius: 999px;
-      background: linear-gradient(135deg, #7c3aed, #a78bfa);
-      color: #fff;
-      font-size: 1.1rem;
-      font-weight: 700;
-      cursor: pointer;
-      box-shadow: 0 4px 24px rgba(124,58,237,0.5);
-      transition: transform 0.1s;
-    }
-
-    #btn:active { transform: scale(0.95); }
-
-    #mode-badge {
-      position: fixed;
-      top: 50px;
-      right: 8px;
-      font-size: 0.65rem;
-      color: rgba(255,255,255,0.35);
-      z-index: 10;
-      text-transform: uppercase;
-      letter-spacing: 0.08em;
-    }
-
-    #timer-bar-wrap {
-      position: fixed;
-      bottom: 0; left: 0; right: 0;
-      height: 6px;
-      background: rgba(255,255,255,0.1);
-      z-index: 10;
-    }
-
-    #timer-bar {
-      height: 100%;
-      background: linear-gradient(90deg, #7c3aed, #a78bfa);
-      transition: width 0.1s linear;
+      transition: opacity 1s;
+      white-space: nowrap;
     }
   </style>
 </head>
 <body>
 
 <div id="hud">
-  Score: <span id="score-display">0</span>
-  &nbsp;&nbsp;|&nbsp;&nbsp;
-  Combo: <span id="combo-display">x1</span>
-  &nbsp;&nbsp;|&nbsp;&nbsp;
-  Time: <span id="time-display">30</span>s
+  <div><span id="my-color"></span><span id="my-label">You</span></div>
+  <div id="bubble-count">0 bubbles</div>
+  <div id="status">connecting…</div>
 </div>
 
-<div id="mode-badge"></div>
-<div id="arena"></div>
-<canvas id="game-canvas"></canvas>
-<div id="timer-bar-wrap"><div id="timer-bar" style="width:100%"></div></div>
+<canvas id="c"></canvas>
+<div id="hint">tap to create &middot; tap a bubble to pop it</div>
 
-<div id="overlay">
-  <h1>Bubble Pop</h1>
-  <p>Tap bubbles before they vanish! Bigger combos = more points.</p>
+<script type="module">
+import { initializeApp }                          from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+import { getDatabase, ref, push, remove,
+         onChildAdded, onChildRemoved }           from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
 
-  <div class="mode-btns">
-    <button class="mode-btn active" data-mode="dom">DOM</button>
-    <button class="mode-btn" data-mode="canvas">Canvas</button>
-  </div>
+// ── Firebase ──────────────────────────────────────────────────
+const app = initializeApp({
+  apiKey:            "AIzaSyDahtsY5sPrO6DK69KzhdYO9zqmqfMBsKM",
+  authDomain:        "train-scratch-1.firebaseapp.com",
+  databaseURL:       "https://train-scratch-1-default-rtdb.firebaseio.com",
+  projectId:         "train-scratch-1",
+  storageBucket:     "train-scratch-1.firebasestorage.app",
+  messagingSenderId: "625819447256",
+  appId:             "1:625819447256:web:cee18c3b98e9a9245c8cad",
+});
+const db = getDatabase(app);
 
-  <div class="slider-row">
-    Bubbles:
-    <input type="range" id="bubble-count-slider" min="5" max="200" value="15" step="5">
-    <span id="bubble-count-label">15</span>
-  </div>
+// ── Session identity ──────────────────────────────────────────
+let sessionId = sessionStorage.getItem('bub-sid');
+if (!sessionId) {
+  sessionId = Math.random().toString(36).slice(2);
+  sessionStorage.setItem('bub-sid', sessionId);
+}
 
-  <div class="score-line" id="final-score"></div>
-  <button id="btn">Play</button>
-</div>
+let myHue = parseInt(sessionStorage.getItem('bub-hue'));
+if (isNaN(myHue)) {
+  myHue = Math.floor(Math.random() * 360);
+  sessionStorage.setItem('bub-hue', myHue);
+}
 
-<script>
-  // ── Elements ──────────────────────────────────────────────────
-  const arena        = document.getElementById('arena');
-  const canvas       = document.getElementById('game-canvas');
-  const ctx          = canvas.getContext('2d');
-  const overlay      = document.getElementById('overlay');
-  const playBtn      = document.getElementById('btn');
-  const scoreDisplay = document.getElementById('score-display');
-  const comboDisplay = document.getElementById('combo-display');
-  const timeDisplay  = document.getElementById('time-display');
-  const timerBar     = document.getElementById('timer-bar');
-  const finalScore   = document.getElementById('final-score');
-  const modeBadge    = document.getElementById('mode-badge');
-  const slider       = document.getElementById('bubble-count-slider');
-  const sliderLabel  = document.getElementById('bubble-count-label');
-  const modeBtns     = document.querySelectorAll('.mode-btn');
+// ── HUD ───────────────────────────────────────────────────────
+const myColorEl     = document.getElementById('my-color');
+const bubbleCountEl = document.getElementById('bubble-count');
+const statusEl      = document.getElementById('status');
+const hintEl        = document.getElementById('hint');
 
-  // ── Constants ─────────────────────────────────────────────────
-  const GAME_DURATION = 30;
-  const EMOJIS = ['🫧','💜','⭐','🔵','🟣','💫','🌀','✨'];
-  const COLORS = [
-    ['#7c3aed','#a78bfa'],
-    ['#0ea5e9','#38bdf8'],
-    ['#ec4899','#f9a8d4'],
-    ['#10b981','#6ee7b7'],
-    ['#f59e0b','#fde68a'],
-  ];
+myColorEl.style.background = `hsl(${myHue}, 80%, 65%)`;
 
-  // ── Game state ────────────────────────────────────────────────
-  let score, combo, timeLeft, running;
-  let selectedMode  = 'dom';
-  let bubbleTarget  = 15;
-  let rafId, timerInterval;
+// ── Canvas ────────────────────────────────────────────────────
+const canvas = document.getElementById('c');
+const ctx    = canvas.getContext('2d');
 
-  // DOM mode
-  let domBubbles = [];
+function resize() {
+  canvas.width  = canvas.clientWidth;
+  canvas.height = canvas.clientHeight;
+}
+resize();
+window.addEventListener('resize', resize);
 
-  // Canvas mode
-  let cBubbles = [];
-  let cLabels  = [];
+// ── Bubble state ──────────────────────────────────────────────
+const bubbles = new Map(); // Firebase key → bubble object
+const EMOJIS  = ['🫧','💜','⭐','🔵','🟣','💫','🌀','✨','🎈','🌸'];
 
-  // ── UI controls ───────────────────────────────────────────────
-  slider.addEventListener('input', () => {
-    bubbleTarget = +slider.value;
-    sliderLabel.textContent = bubbleTarget;
+function hueColors(hue) {
+  return {
+    inner: `hsl(${hue}, 70%, 75%)`,
+    outer: `hsl(${hue}, 80%, 45%)`,
+    glow:  `hsl(${hue}, 80%, 55%)`,
+  };
+}
+
+// ── Firebase listeners ────────────────────────────────────────
+const bubblesRef = ref(db, 'bubbles');
+
+onChildAdded(bubblesRef, snap => {
+  bubbles.set(snap.key, {
+    ...snap.val(),
+    colors:  hueColors(snap.val().hue),
+    addedAt: performance.now(),
+    dying:   false,
+    dyingAt: 0,
   });
+  updateCount();
+  statusEl.textContent = 'connected';
+});
 
-  modeBtns.forEach(mb => {
-    mb.addEventListener('pointerdown', e => {
-      e.preventDefault();
-      selectedMode = mb.dataset.mode;
-      modeBtns.forEach(x => x.classList.toggle('active', x === mb));
-    });
+onChildRemoved(bubblesRef, snap => {
+  const b = bubbles.get(snap.key);
+  if (!b) return;
+  b.dying   = true;
+  b.dyingAt = performance.now();
+  setTimeout(() => { bubbles.delete(snap.key); updateCount(); }, 220);
+});
+
+function updateCount() {
+  const n = bubbles.size;
+  bubbleCountEl.textContent = `${n} bubble${n !== 1 ? 's' : ''}`;
+}
+
+// ── Interaction ───────────────────────────────────────────────
+let hintGone = false;
+
+canvas.addEventListener('pointerdown', e => {
+  e.preventDefault();
+  if (!hintGone) { hintEl.style.opacity = '0'; hintGone = true; }
+
+  const rect = canvas.getBoundingClientRect();
+  const tx = e.clientX - rect.left;
+  const ty = e.clientY - rect.top;
+
+  // Tap existing bubble → pop it
+  for (const [key, b] of [...bubbles.entries()].reverse()) {
+    if (b.dying) continue;
+    const dx = tx - b.x, dy = ty - b.y;
+    if (dx*dx + dy*dy <= b.r*b.r) {
+      remove(ref(db, `bubbles/${key}`));
+      return;
+    }
+  }
+
+  // Tap empty space → create bubble
+  push(bubblesRef, {
+    x:         tx,
+    y:         ty,
+    r:         Math.round(24 + Math.random() * 24),
+    hue:       myHue,
+    ownerId:   sessionId,
+    emoji:     EMOJIS[Math.floor(Math.random() * EMOJIS.length)],
+    createdAt: Date.now(),
   });
+});
 
-  // ── Shared helpers ────────────────────────────────────────────
-  function rand(a, b)  { return a + Math.random() * (b - a); }
-  function randColor() { return COLORS[Math.floor(Math.random() * COLORS.length)]; }
-  function randEmoji() { return EMOJIS[Math.floor(Math.random() * EMOJIS.length)]; }
+// ── Render loop ───────────────────────────────────────────────
+function draw(now) {
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-  function registerHit() {
-    combo = Math.min(combo + 1, 8);
-    const pts = 10 * combo;
-    score += pts;
-    scoreDisplay.textContent = score;
-    comboDisplay.textContent = `x${combo}`;
-    return pts;
-  }
+  for (const b of bubbles.values()) {
+    const scale = b.dying
+      ? Math.max(0, 1 - (now - b.dyingAt) / 200)
+      : Math.min(1, (now - b.addedAt) / 150);
 
-  function registerMiss() {
-    combo = 1;
-    comboDisplay.textContent = `x1`;
-  }
+    ctx.save();
+    ctx.translate(b.x, b.y);
+    ctx.scale(scale, scale);
 
-  // ── DOM mode ──────────────────────────────────────────────────
-  function domSpawnOne() {
-    if (!running) return;
-    const size = Math.round(rand(48, 96));
-    const [c1, c2] = randColor();
-    const el = document.createElement('div');
-    el.className = 'bubble';
-    el.style.cssText = `
-      width:${size}px; height:${size}px;
-      left:${rand(0, arena.clientWidth  - size)}px;
-      top:${rand(0,  arena.clientHeight - size)}px;
-      background: radial-gradient(circle at 35% 35%, ${c2}, ${c1});
-      box-shadow: 0 0 ${size/3}px ${c1}88;
-      font-size:${size * 0.42}px;
-    `;
-    el.textContent = randEmoji();
-
-    const entry = { el, expire: null };
-    entry.expire = setTimeout(() => domPop(entry, false), rand(1800, 3400));
-
-    el.addEventListener('pointerdown', e => {
-      e.preventDefault();
-      clearTimeout(entry.expire);
-      domPop(entry, true);
-    });
-
-    arena.appendChild(el);
-    domBubbles.push(entry);
-  }
-
-  function domPop(entry, hit) {
-    const { el } = entry;
-    if (!el.parentNode || el.classList.contains('dying')) return;
-    el.classList.add('dying');
-    domBubbles = domBubbles.filter(b => b !== entry);
-
-    if (hit) {
-      const pts = registerHit();
-      const rect = el.getBoundingClientRect();
-      const label = document.createElement('div');
-      label.className = 'pop-text';
-      label.textContent = `+${pts}`;
-      label.style.cssText = `
-        left:${rect.left + rect.width/2 - 20}px;
-        top:${rect.top - 10}px;
-        color:${combo >= 4 ? '#fde68a' : '#fff'};
-      `;
-      document.body.appendChild(label);
-      setTimeout(() => label.remove(), 620);
-    } else {
-      registerMiss();
-    }
-
-    setTimeout(() => { el.remove(); if (running) domSpawnOne(); }, 220);
-  }
-
-  function startDom() {
-    arena.style.display = 'block';
-    canvas.style.display = 'none';
-    arena.innerHTML = '';
-    domBubbles = [];
-    for (let i = 0; i < bubbleTarget; i++) domSpawnOne();
-  }
-
-  function stopDom() {
-    domBubbles.forEach(b => clearTimeout(b.expire));
-    domBubbles = [];
-    arena.innerHTML = '';
-  }
-
-  // ── Canvas mode ───────────────────────────────────────────────
-  function resizeCanvas() {
-    canvas.width  = canvas.clientWidth;
-    canvas.height = canvas.clientHeight;
-  }
-
-  function cSpawnOne(now) {
-    const r = Math.round(rand(24, 48));
-    const [c1, c2] = randColor();
-    cBubbles.push({
-      x: rand(r, canvas.width  - r),
-      y: rand(r, canvas.height - r),
-      r, c1, c2,
-      emoji: randEmoji(),
-      born: now,
-      life: rand(1800, 3400),
-      dying: false,
-      dyingAt: 0,
-    });
-  }
-
-  function cTick(now) {
-    if (!running) return;
-
-    // Mark expired bubbles as dying
-    for (const b of cBubbles) {
-      if (!b.dying && now - b.born > b.life) {
-        b.dying = true;
-        b.dyingAt = now;
-        registerMiss();
-      }
-    }
-
-    // Remove fully animated-out bubbles
-    cBubbles = cBubbles.filter(b => !(b.dying && now - b.dyingAt > 200));
-
-    // Spawn to maintain target count
-    const active = cBubbles.filter(b => !b.dying).length;
-    for (let i = active; i < bubbleTarget; i++) cSpawnOne(now);
-
-    // Remove old labels
-    cLabels = cLabels.filter(l => now - l.born < 620);
-
-    // Draw
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-    for (const b of cBubbles) {
-      const scale = b.dying
-        ? Math.max(0, 1 - (now - b.dyingAt) / 200)
-        : Math.min(1, (now - b.born) / 150);
-
-      ctx.save();
-      ctx.translate(b.x, b.y);
-      ctx.scale(scale, scale);
-
-      const g = ctx.createRadialGradient(-b.r * 0.2, -b.r * 0.2, 0, 0, 0, b.r);
-      g.addColorStop(0, b.c2);
-      g.addColorStop(1, b.c1);
-
+    // Glow ring on your own bubbles
+    if (b.ownerId === sessionId) {
       ctx.beginPath();
-      ctx.arc(0, 0, b.r, 0, Math.PI * 2);
-      ctx.fillStyle = g;
-      ctx.shadowColor = b.c1;
-      ctx.shadowBlur = b.r / 2;
-      ctx.fill();
-      ctx.shadowBlur = 0;
-
-      ctx.font = `${Math.round(b.r * 0.9)}px serif`;
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
-      ctx.fillText(b.emoji, 0, 0);
-
-      ctx.restore();
+      ctx.arc(0, 0, b.r + 4, 0, Math.PI * 2);
+      ctx.strokeStyle = `hsla(${b.hue}, 80%, 70%, 0.5)`;
+      ctx.lineWidth   = 2;
+      ctx.stroke();
     }
 
-    for (const l of cLabels) {
-      const t = (now - l.born) / 620;
-      ctx.save();
-      ctx.globalAlpha = 1 - t;
-      ctx.font = `800 ${Math.round(24 * (1 + 0.4 * t))}px system-ui, sans-serif`;
-      ctx.fillStyle = l.color;
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
-      ctx.fillText(l.text, l.x, l.y - 60 * t);
-      ctx.restore();
-    }
+    // Fill
+    const g = ctx.createRadialGradient(-b.r * 0.2, -b.r * 0.2, 0, 0, 0, b.r);
+    g.addColorStop(0, b.colors.inner);
+    g.addColorStop(1, b.colors.outer);
 
-    rafId = requestAnimationFrame(cTick);
+    ctx.beginPath();
+    ctx.arc(0, 0, b.r, 0, Math.PI * 2);
+    ctx.fillStyle   = g;
+    ctx.shadowColor = b.colors.glow;
+    ctx.shadowBlur  = b.r / 2;
+    ctx.fill();
+    ctx.shadowBlur  = 0;
+
+    // Emoji
+    ctx.font         = `${Math.round(b.r * 0.9)}px serif`;
+    ctx.textAlign    = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(b.emoji, 0, 0);
+
+    ctx.restore();
   }
 
-  function cOnTap(e) {
-    e.preventDefault();
-    if (!running) return;
-    const rect = canvas.getBoundingClientRect();
-    const tx = e.clientX - rect.left;
-    const ty = e.clientY - rect.top;
+  requestAnimationFrame(draw);
+}
 
-    for (let i = cBubbles.length - 1; i >= 0; i--) {
-      const b = cBubbles[i];
-      if (b.dying) continue;
-      const dx = tx - b.x, dy = ty - b.y;
-      if (dx*dx + dy*dy <= b.r*b.r) {
-        b.dying = true;
-        b.dyingAt = performance.now();
-        const pts = registerHit();
-        cLabels.push({
-          x: b.x, y: b.y - b.r,
-          text: `+${pts}`,
-          color: combo >= 4 ? '#fde68a' : '#fff',
-          born: performance.now(),
-        });
-        return;
-      }
-    }
-  }
-
-  function startCanvas() {
-    arena.style.display = 'none';
-    canvas.style.display = 'block';
-    resizeCanvas();
-    cBubbles = [];
-    cLabels  = [];
-    canvas.addEventListener('pointerdown', cOnTap);
-    rafId = requestAnimationFrame(cTick);
-  }
-
-  function stopCanvas() {
-    cancelAnimationFrame(rafId);
-    canvas.removeEventListener('pointerdown', cOnTap);
-    cBubbles = [];
-    cLabels  = [];
-  }
-
-  // ── Game flow ─────────────────────────────────────────────────
-  function startGame() {
-    score = 0; combo = 1;
-    scoreDisplay.textContent = '0';
-    comboDisplay.textContent = 'x1';
-    timeDisplay.textContent  = GAME_DURATION;
-    timerBar.style.width = '100%';
-    overlay.style.display = 'none';
-    modeBadge.textContent = selectedMode;
-    running = true;
-
-    if (selectedMode === 'dom') startDom();
-    else                        startCanvas();
-
-    const t0 = performance.now();
-    timerInterval = setInterval(() => {
-      timeLeft = Math.max(0, GAME_DURATION - (performance.now() - t0) / 1000);
-      timeDisplay.textContent = Math.ceil(timeLeft);
-      timerBar.style.width = `${(timeLeft / GAME_DURATION) * 100}%`;
-      if (timeLeft <= 0) endGame();
-    }, 100);
-  }
-
-  function endGame() {
-    running = false;
-    clearInterval(timerInterval);
-
-    if (selectedMode === 'dom') stopDom();
-    else                        stopCanvas();
-
-    finalScore.textContent = `Your score: ${score}`;
-    finalScore.style.display = 'block';
-    playBtn.textContent = 'Play Again';
-    overlay.style.display = 'flex';
-  }
-
-  playBtn.addEventListener('pointerdown', e => {
-    e.preventDefault();
-    startGame();
-  });
-
-  window.addEventListener('resize', () => {
-    if (selectedMode === 'canvas' && running) resizeCanvas();
-  });
+requestAnimationFrame(draw);
 </script>
 </body>
 </html>
